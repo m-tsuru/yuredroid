@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.sasakulab.yure_android_client"
-        minSdk = 29
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
