@@ -19,8 +19,8 @@ import okhttp3.*
 
 class YureSensorService : Service(), SensorEventListener {
 
-    private var BUFFER_SIZE: Int = 30
-    private var HOST_NAME: String = "wss://unstable.kusaremkn.com/yure"
+    private var bufferSize: Int = 30
+    private var hostName: String = "wss://unstable.kusaremkn.com/yure"
     private val CHANNEL_ID = "YureSensorServiceChannel"
     private val NOTIFICATION_ID = 1
 
@@ -45,12 +45,18 @@ class YureSensorService : Service(), SensorEventListener {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
             ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
-        // Connect WebSocket
-        connectWebSocket()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Get settings from intent
+        intent?.let {
+            hostName = it.getStringExtra("serverUrl") ?: hostName
+            bufferSize = it.getIntExtra("bufferSize", bufferSize)
+        }
+
+        // Connect WebSocket with configured URL
+        connectWebSocket()
+
         // Start foreground service with notification
         val notification = createNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -111,7 +117,7 @@ class YureSensorService : Service(), SensorEventListener {
     private fun connectWebSocket() {
         val client = OkHttpClient()
         val request = Request.Builder()
-            .url(HOST_NAME)
+            .url(hostName)
             .build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
@@ -142,7 +148,7 @@ class YureSensorService : Service(), SensorEventListener {
 
                 synchronized(bufferLock) {
                     dataBuffer.add(data)
-                    if (dataBuffer.size >= BUFFER_SIZE) {
+                    if (dataBuffer.size >= bufferSize) {
                         sendDataToServer()
                     }
                 }
