@@ -146,6 +146,9 @@ class YureSensorService : Service(), SensorEventListener {
                     t = System.currentTimeMillis()
                 )
 
+                // Send data to MainActivity via listener
+                MainActivity.dataListener?.invoke(data)
+
                 synchronized(bufferLock) {
                     dataBuffer.add(data)
                     if (dataBuffer.size >= bufferSize) {
