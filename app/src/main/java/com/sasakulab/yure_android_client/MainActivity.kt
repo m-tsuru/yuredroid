@@ -2,8 +2,11 @@ package com.sasakulab.yure_android_client
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -63,10 +66,12 @@ class MainActivity : ComponentActivity() {
                         serverUrl = getServerUrl(),
                         bufferSize = getBufferSize(),
                         sensorData = sensorDataBuffer,
+                        isBatteryOptimized = !isBatteryOptimizationIgnored(),
                         onStartClick = { startSharing() },
                         onStopClick = { stopSharing() },
                         onServerUrlChanged = { saveServerUrl(it) },
                         onBufferSizeChanged = { saveBufferSize(it) },
+                        onRequestBatteryOptimization = { requestIgnoreBatteryOptimization() },
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -115,6 +120,27 @@ class MainActivity : ComponentActivity() {
         prefs.edit().putInt("bufferSize", size).apply()
     }
 
+    // Check if battery optimization is ignored
+    private fun isBatteryOptimizationIgnored(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            return powerManager.isIgnoringBatteryOptimizations(packageName)
+        }
+        return true
+    }
+
+    // Request to ignore battery optimization
+    private fun requestIgnoreBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!isBatteryOptimizationIgnored()) {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            }
+        }
+    }
+
     // Start to share accelerometer data
     private fun startSharing() {
         val serviceIntent = Intent(this, YureSensorService::class.java).apply {
@@ -161,10 +187,12 @@ fun YureScreen(
     serverUrl: String,
     bufferSize: Int,
     sensorData: List<AccelerationData>,
+    isBatteryOptimized: Boolean,
     onStartClick: () -> Unit,
     onStopClick: () -> Unit,
     onServerUrlChanged: (String) -> Unit,
     onBufferSizeChanged: (Int) -> Unit,
+    onRequestBatteryOptimization: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showServerUrlDialog by remember { mutableStateOf(false) }
@@ -234,6 +262,40 @@ fun YureScreen(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+
+        // Battery optimization warning
+        if (isBatteryOptimized) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Battery Optimization Enabled",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Background operation may stop after hours. Please disable battery optimization for continuous operation.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = onRequestBatteryOptimization,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Disable Battery Optimization")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         Button(
             onClick = { showServerUrlDialog = true },

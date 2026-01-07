@@ -13,6 +13,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import okhttp3.*
@@ -31,6 +32,7 @@ class YureSensorService : Service(), SensorEventListener {
     private val gson = Gson()
     private lateinit var yureId: String
     private val bufferLock = Any()
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -45,6 +47,15 @@ class YureSensorService : Service(), SensorEventListener {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
             ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        // Acquire WakeLock to keep CPU running
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "YureSensorService::WakeLock"
+        ).apply {
+            acquire(10*60*60*1000L /*10 hours*/)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -204,5 +215,25 @@ class YureSensorService : Service(), SensorEventListener {
         }
 
         webSocket?.close(1000, "Service destroyed")
+
+        // Release WakeLock
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+            }
+        }
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        // Restart service when task is removed
+        val restartServiceIntent = Intent(applicationContext, YureSensorService::class.java).apply {
+            setPackage(packageName)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(restartServiceIntent)
+        } else {
+            startService(restartServiceIntent)
+        }
     }
 }
