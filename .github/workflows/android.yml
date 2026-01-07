@@ -36,16 +36,11 @@ jobs:
         run: chmod +x gradlew
       - name: build Release
         run: ./gradlew assembleRelease
-      - name: List build outputs
-        run: |
-          echo "Listing build outputs:"
-          find app/build/outputs -type f -name "*.apk"
       - name: Create Release
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # latest
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: app/build/outputs/apk/release/*.apk
-          file_glob: true
+          file: app/build/outputs/apk/release/app-release-unsigned.apk
           asset_name: yuredroid-${{ steps.get_version.outputs.version }}.apk
           tag: ${{ github.ref }}
           overwrite: true
