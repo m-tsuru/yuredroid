@@ -176,7 +176,8 @@ data class AccelerationData(
     val x: Double,
     val y: Double,
     val z: Double,
-    val t: Long
+    val t: Long,
+    val userAgent: String,
 )
 
 @Composable
