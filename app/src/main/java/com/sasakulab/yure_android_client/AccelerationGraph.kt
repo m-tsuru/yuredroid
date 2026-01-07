@@ -41,14 +41,13 @@ fun AccelerationGraph(
                 val height = size.height
                 val centerY = height / 2f
 
-                // グラフパラメータ（JavaScriptコードと同様）
-                val tDiv = 50f // 時間の縮小率
-                val xMul = 10f // ゆれの拡大率（調整：100 -> 10）
-                val xOff = 50f // X 方向のゆれの位置
-                val yOff = 0f // Y 方向のゆれの位置
-                val zOff = -50f // Z 方向のゆれの位置
+                val tDiv = 50f
+                val xMul = 10f
+                val xOff = 50f
+                val yOff = 0f
+                val zOff = -50f
 
-                // 背景の横線を描画
+                // Background Grid Lines
                 drawLine(
                     color = Color.Gray.copy(alpha = 0.25f),
                     start = Offset(0f, centerY + xOff),
@@ -68,7 +67,7 @@ fun AccelerationGraph(
                     strokeWidth = 1f
                 )
 
-                // 縦線（時間軸のグリッド）を描画
+                // Draw vertical lines (time axis grid)
                 var i = 0f
                 while (i < width) {
                     drawLine(
@@ -82,7 +81,7 @@ fun AccelerationGraph(
 
                 if (sensorData.isEmpty()) return@Canvas
 
-                // X軸のデータを赤色で描画
+                // Draw X-axis data in red
                 val xPath = Path()
                 var isFirstX = true
                 sensorData.asReversed().forEach { data ->
@@ -103,7 +102,7 @@ fun AccelerationGraph(
                     style = Stroke(width = 2f)
                 )
 
-                // Y軸のデータを緑色で描画
+                // Draw Y-axis data in green
                 val yPath = Path()
                 var isFirstY = true
                 sensorData.asReversed().forEach { data ->
@@ -124,7 +123,7 @@ fun AccelerationGraph(
                     style = Stroke(width = 2f)
                 )
 
-                // Z軸のデータを青色で描画
+                // Draw Z-axis data in blue
                 val zPath = Path()
                 var isFirstZ = true
                 sensorData.asReversed().forEach { data ->

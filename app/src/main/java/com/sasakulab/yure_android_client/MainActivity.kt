@@ -171,7 +171,7 @@ fun YureScreen(
     var showBufferSizeDialog by remember { mutableStateOf(false) }
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
-    // 描画を定期的に更新
+    // Reload current time every 50ms
     LaunchedEffect(Unit) {
         while (true) {
             delay(50)
@@ -204,7 +204,7 @@ fun YureScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // グラフ表示（常に表示、データがない場合は空のグラフ）
+        // Display graph (always displayed, empty graph if no data)
         AccelerationGraph(
             sensorData = sensorData,
             currentTime = currentTime,
