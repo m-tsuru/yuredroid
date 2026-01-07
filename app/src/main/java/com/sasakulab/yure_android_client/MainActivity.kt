@@ -7,15 +7,23 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.sasakulab.yure_android_client.ui.theme.YureandroidclientTheme
+import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
@@ -23,12 +31,26 @@ class MainActivity : ComponentActivity() {
     private lateinit var yureId: String
     private var isSharing = mutableStateOf(false)
     private var statusText = mutableStateOf("Stop")
+    private val sensorDataBuffer = mutableStateListOf<AccelerationData>()
+    private val maxBufferSize = 3000
+
+    companion object {
+        var dataListener: ((AccelerationData) -> Unit)? = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Get or Generate ゆれ識別子
         yureId = getYureId()
+
+        // Set data listener
+        dataListener = { data ->
+            sensorDataBuffer.add(0, data)
+            if (sensorDataBuffer.size > maxBufferSize) {
+                sensorDataBuffer.removeAt(sensorDataBuffer.size - 1)
+            }
+        }
 
         enableEdgeToEdge()
         setContent {
@@ -40,6 +62,7 @@ class MainActivity : ComponentActivity() {
                         statusText = statusText.value,
                         serverUrl = getServerUrl(),
                         bufferSize = getBufferSize(),
+                        sensorData = sensorDataBuffer,
                         onStartClick = { startSharing() },
                         onStopClick = { stopSharing() },
                         onServerUrlChanged = { saveServerUrl(it) },
@@ -117,6 +140,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        dataListener = null
     }
 }
 
@@ -136,6 +160,7 @@ fun YureScreen(
     statusText: String,
     serverUrl: String,
     bufferSize: Int,
+    sensorData: List<AccelerationData>,
     onStartClick: () -> Unit,
     onStopClick: () -> Unit,
     onServerUrlChanged: (String) -> Unit,
@@ -144,10 +169,20 @@ fun YureScreen(
 ) {
     var showServerUrlDialog by remember { mutableStateOf(false) }
     var showBufferSizeDialog by remember { mutableStateOf(false) }
+    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    // Reload current time every 50ms
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(50)
+            currentTime = System.currentTimeMillis()
+        }
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -166,7 +201,19 @@ fun YureScreen(
             text = statusText,
             style = MaterialTheme.typography.bodyLarge
         )
-        Spacer(modifier = Modifier.height(32.dp))
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Display graph (always displayed, empty graph if no data)
+        AccelerationGraph(
+            sensorData = sensorData,
+            currentTime = currentTime,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(250.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = onStartClick,
