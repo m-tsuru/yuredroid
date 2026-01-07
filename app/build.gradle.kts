@@ -4,6 +4,25 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+fun getGitVersion(): String {
+    return try {
+        val process = Runtime.getRuntime().exec("git describe --tags --always --dirty")
+        val version = process.inputStream.bufferedReader().readText().trim()
+        if (version.startsWith("v")) version.substring(1) else version
+    } catch (e: Exception) {
+        "1.0.0-beta" // Fallback version
+    }
+}
+
+fun getVersionCode(): Int {
+    return try {
+        val process = Runtime.getRuntime().exec("git rev-list --count HEAD")
+        process.inputStream.bufferedReader().readText().trim().toInt()
+    } catch (e: Exception) {
+        1 // Fallback version code
+    }
+}
+
 android {
     namespace = "com.sasakulab.yure_android_client"
     compileSdk {
@@ -14,8 +33,8 @@ android {
         applicationId = "com.sasakulab.yure_android_client"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.2.0"
+        versionCode = getVersionCode()
+        versionName = getGitVersion()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
