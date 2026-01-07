@@ -155,7 +155,7 @@ class YureSensorService : Service(), SensorEventListener {
                     y = it.values[1].toDouble(),
                     z = it.values[2].toDouble(),
                     t = System.currentTimeMillis(),
-                    userAgent = String.format("yuredroid %s", packageManager.getPackageInfo(packageName, 0).versionName),
+                    userAgent = String.format("yuredroid %s on %s %s", packageManager.getPackageInfo(packageName, 0).versionName, Build.MANUFACTURER, Build.MODEL),
                 )
 
                 // Send data to MainActivity via listener
