@@ -14,6 +14,7 @@ import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import okhttp3.*
@@ -33,6 +34,22 @@ class YureSensorService : Service(), SensorEventListener {
     private lateinit var yureId: String
     private val bufferLock = Any()
     private var wakeLock: PowerManager.WakeLock? = null
+    private val RECONNECT_INTERVAL_MS = 5_000L
+    private var isConnected = false
+    private var isReconnecting = false
+
+    private val reconnectHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val reconnectRunnable = object : Runnable {
+        override fun run() {
+            if (!isConnected) {
+                connectWebSocket()
+                reconnectHandler.postDelayed(this, RECONNECT_INTERVAL_MS)
+            } else {
+                isReconnecting = false
+            }
+        }
+    }
+
 
     override fun onCreate() {
         super.onCreate()
@@ -126,6 +143,9 @@ class YureSensorService : Service(), SensorEventListener {
     }
 
     private fun connectWebSocket() {
+        webSocket?.cancel()
+        webSocket = null
+
         val client = OkHttpClient()
         val request = Request.Builder()
             .url(hostName)
@@ -133,17 +153,36 @@ class YureSensorService : Service(), SensorEventListener {
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                isConnected = true
                 updateNotification("Connected")
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                isConnected = false
                 updateNotification("Connection Error")
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                isConnected = false
                 webSocket.close(1000, null)
             }
+
+            override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+                isConnected = false
+                updateNotification("Disconnected: 再接続中")
+                scheduleReconnect()
+            }
         })
+    }
+
+    private fun scheduleReconnect() {
+        if (isReconnecting) {
+            return
+        }
+
+        isReconnecting = true
+        reconnectHandler.removeCallbacks(reconnectRunnable)
+        reconnectHandler.postDelayed(reconnectRunnable, RECONNECT_INTERVAL_MS)
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -176,6 +215,13 @@ class YureSensorService : Service(), SensorEventListener {
     }
 
     private fun sendDataToServer() {
+        // Save data to buffer while trying to reconnect
+        if (!isConnected || webSocket == null) {
+            updateNotification("未接続: バッファ保持中")
+            scheduleReconnect()
+            return
+        }
+
         val dataToSend: List<AccelerationData>
         synchronized(bufferLock) {
             if (dataBuffer.isEmpty()) return
@@ -189,7 +235,14 @@ class YureSensorService : Service(), SensorEventListener {
         if (sent) {
             updateNotification("送信中: ${dataToSend.size}件")
         } else {
-            updateNotification("送信失敗")
+            isConnected = false
+            updateNotification("送信失敗: 再接続待ち")
+            scheduleReconnect()
+
+            // Automatically reconnecting to the server
+            synchronized(bufferLock) {
+                dataBuffer.addAll(0, dataToSend)
+            }
         }
     }
 
@@ -206,15 +259,13 @@ class YureSensorService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        // Clean up the handler for reconnecting
+        reconnectHandler.removeCallbacksAndMessages(null)
+        isReconnecting = false
+        isConnected = false
+
         sensorManager.unregisterListener(this)
-
-        // Send remaining data
-        synchronized(bufferLock) {
-            if (dataBuffer.isNotEmpty()) {
-                sendDataToServer()
-            }
-        }
-
         webSocket?.close(1000, "Service destroyed")
 
         // Release WakeLock
