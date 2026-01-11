@@ -14,12 +14,17 @@ import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import okhttp3.*
+import kotlin.time.Duration.Companion.nanoseconds
 
 class YureSensorService : Service(), SensorEventListener {
+
+    private val ReferenceUnixTime: Long = System.currentTimeMillis()
+    private val ReferenceTimefromBoot: Long = SystemClock.elapsedRealtime()
 
     private var bufferSize: Int = 30
     private var hostName: String = "wss://unstable.kusaremkn.com/yure"
@@ -194,7 +199,7 @@ class YureSensorService : Service(), SensorEventListener {
                     x = it.values[0].toDouble(),
                     y = it.values[1].toDouble(),
                     z = it.values[2].toDouble(),
-                    t = System.currentTimeMillis(),
+                    t = ReferenceUnixTime + it.timestamp.nanoseconds.inWholeMilliseconds - ReferenceTimefromBoot,
                     userAgent = String.format("yuredroid %s on %s %s", packageManager.getPackageInfo(packageName, 0).versionName, Build.MANUFACTURER, Build.MODEL),
                 )
 
