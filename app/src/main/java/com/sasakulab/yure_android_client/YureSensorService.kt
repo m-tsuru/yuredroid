@@ -42,6 +42,7 @@ class YureSensorService : Service(), SensorEventListener {
     private val reconnectRunnable = object : Runnable {
         override fun run() {
             if (!isConnected) {
+                webSocket?.close(1000, "Socket destroyed while connecting")
                 connectWebSocket()
                 reconnectHandler.postDelayed(this, RECONNECT_INTERVAL_MS)
             } else {
